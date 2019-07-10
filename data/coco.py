@@ -28,7 +28,9 @@ class COCODetection(data.Dataset):
                  dataset_name='COCO'):
         self.root = root
         self.data_path = os.path.join(os.path.expanduser("~"),'data')
-        self.cache_path = os.path.join(self.data_path, 'coco_cache')
+        self.cache_path = os.path.join(
+            '/data/dataset-M2Det/20190710_early_advanced_polyp/dataset/coco_cache'
+        )
         self.image_set = image_sets
         self.preproc = preproc
         self.target_transform = target_transform
@@ -58,7 +60,14 @@ class COCODetection(data.Dataset):
                                                   _COCO.getCatIds()))
             indexes = _COCO.getImgIds()
             self.image_indexes = indexes
-            self.ids.extend([self.image_path_from_index(data_name, index) for index in indexes ])
+            with open(annofile) as f:
+                annodict = json.loads(f.read())
+            image_id_dict = {
+                info['id']: info for info in annodict['images']
+            }
+            self.ids.extend([
+                self.image_path_from_index(data_name, index, image_id_dict) for index in indexes
+            ])
             if image_set.find('test') != -1:
                 print('test set will not load annotations!')
             else:
@@ -66,26 +75,26 @@ class COCODetection(data.Dataset):
 
 
 
-    def image_path_from_index(self, name, index):
-        """
-        Construct an image path from the image's "index" identifier.
-        """
-        # Example image path for index=119993:
-        #   images/train2014/COCO_train2014_000000119993.jpg
-        file_name = ('COCO_' + name + '_' +
-                     str(index).zfill(12) + '.jpg')
-        image_path = os.path.join(self.root, 'images',
-                              name, file_name)
-        assert os.path.exists(image_path), \
-                'Path does not exist: {}'.format(image_path)
-        return image_path
+    def image_path_from_index(self, name, index, image_id_dict):
+        return name + '/' + image_id_dict[index]['file_name']
+        # """
+        # Construct an image path from the image's "index" identifier.
+        # """
+        # # Example image path for index=119993:
+        # #   images/train2014/COCO_train2014_000000119993.jpg
+        # file_name = ('COCO_' + name + '_' +
+        #              str(index).zfill(12) + '.jpg')
+        # image_path = os.path.join(self.root, 'images',
+        #                       name, file_name)
+        # assert os.path.exists(image_path), \
+        #         'Path does not exist: {}'.format(image_path)
+        # return image_path
 
 
     def _get_ann_file(self, name):
         prefix = 'instances' if name.find('test') == -1 \
                 else 'image_info'
-        return os.path.join(self.root, 'annotations',
-                        prefix + '_' + name + '.json')
+        return os.path.join(self.root, name + '.json')
 
 
     def _load_coco_annotations(self, coco_name, indexes, _COCO):
@@ -149,7 +158,7 @@ class COCODetection(data.Dataset):
     def __getitem__(self, index):
         img_id = self.ids[index]
         target = self.annotations[index]
-        img = cv2.imread(img_id, cv2.IMREAD_COLOR)
+        img = cv2.imread(self.root + '/' + img_id, cv2.IMREAD_COLOR)
         height, width, _ = img.shape
 
         if self.target_transform is not None:
